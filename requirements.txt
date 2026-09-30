@@ -1,0 +1,15 @@
+anthropic==0.123.0
+fastapi==0.141.1
+httpx==0.28.1
+langgraph==1.2.11
+langgraph-checkpoint==4.2.0
+langgraph-prebuilt==1.1.0
+langgraph-sdk==0.4.2
+ollama==0.6.2
+pydantic==2.13.4
+pydantic_core==2.46.4
+pypdf==6.19.0
+pytest==9.1.1
+python-multipart==0.0.32
+starlette==1.6.0
+uvicorn==0.52.4

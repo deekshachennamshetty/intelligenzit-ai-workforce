@@ -1,0 +1,221 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AI Workforce Platform — MVP</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --bg:#0f1115; --panel:#161920; --card:#1c2029; --line:#262b35;
+    --ink:#e8eaed; --dim:#8b93a3; --accent:#5b8def; --ok:#4caf7d; --warn:#e0a94c; --err:#e0665c;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  header{padding:24px 32px 18px; border-bottom:1px solid var(--line)}
+  header .eyebrow{color:var(--accent); font-size:12px; letter-spacing:.08em; text-transform:uppercase; font-weight:600}
+  header h1{margin:6px 0 4px; font-size:21px; font-weight:650}
+  header p{margin:0; color:var(--dim); font-size:13.5px}
+  main{max-width:760px; margin:0 auto; padding:24px 32px 80px}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px; margin-bottom:18px}
+  textarea{
+    width:100%; min-height:100px; background:#0c0e12; color:var(--ink); border:1px solid var(--line);
+    border-radius:8px; padding:12px; font:14px/1.5 inherit; resize:vertical;
+  }
+  textarea:focus{outline:1px solid var(--accent)}
+  .row{display:flex; gap:10px; align-items:center; margin-top:12px}
+  button{
+    background:var(--accent); color:#0c0e12; border:none; border-radius:7px; padding:9px 18px;
+    font-weight:650; font-size:13.5px; cursor:pointer;
+  }
+  button:disabled{opacity:.45; cursor:default}
+  .meta{color:var(--dim); font-size:12.5px}
+  h2.section{font-size:13px; margin:0 0 14px; color:var(--dim); font-weight:650; text-transform:uppercase; letter-spacing:.05em}
+
+  .timeline{position:relative; padding-left:26px}
+  .timeline::before{content:""; position:absolute; left:9px; top:6px; bottom:6px; width:2px; background:var(--line)}
+  .step{position:relative; margin-bottom:14px}
+  .step::before{
+    content:""; position:absolute; left:-26px; top:4px; width:12px; height:12px; border-radius:50%;
+    background:var(--line); border:2px solid var(--bg);
+  }
+  .step.done::before{background:var(--ok)}
+  .step.rework::before{background:var(--warn)}
+  .step-card{background:var(--card); border:1px solid var(--line); border-radius:9px; padding:12px 14px}
+  .step-head{display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap}
+  .step-title{font-weight:600; font-size:14px}
+  .step-role{color:var(--dim); font-size:12px; margin:2px 0 8px}
+  .step-badge{
+    font-size:11px; font-weight:650; padding:2px 8px; border-radius:5px; text-transform:uppercase; letter-spacing:.03em;
+    white-space:nowrap;
+  }
+  .step-badge.rework{background:#3a2f16; color:var(--warn)}
+  .step-badge.approve{background:#173322; color:var(--ok)}
+  .step-body{white-space:pre-wrap; font-size:13.5px; color:var(--ink); line-height:1.55}
+
+  .badge-final{
+    display:inline-block; font-size:11.5px; font-weight:650; padding:2px 8px; border-radius:5px;
+    text-transform:uppercase; letter-spacing:.03em; margin-left:8px;
+  }
+  .badge-final.approve{background:#173322; color:var(--ok)}
+  #reportBox{white-space:pre-wrap; font-size:14px; line-height:1.6}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">intelligenzit</div>
+  <h1>AI Workforce Platform — internal MVP</h1>
+  <p>Client requirement &rarr; research &rarr; analysis &rarr; solution &rarr; review &rarr; rework &rarr; review &rarr; report</p>
+</header>
+
+<main>
+  <div class="panel">
+    <h2 class="section">Submit a requirement</h2>
+    <textarea id="requestText">A mid-size logistics client wants to modernise their on-prem inventory system. They need something that scales, integrates with their existing SAP setup, and can be delivered within 4 months. Recommend a technology approach.</textarea>
+    <div class="row">
+      <button id="submitBtn">Run workflow</button>
+      <span class="meta" id="statusMeta"></span>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="timelinePanel">
+    <h2 class="section">Workflow execution</h2>
+    <div class="timeline" id="timeline"></div>
+  </div>
+
+  <div class="panel hidden" id="resultPanel">
+    <h2 class="section">Final deliverable <span class="badge-final approve">approved</span></h2>
+    <div id="reportBox"></div>
+  </div>
+</main>
+
+<script>
+const API = "http://localhost:8000";
+
+const AGENT_INFO = {
+  orchestrate: {title: "Orchestrator", role: "Classifies the request and plans which agents are needed."},
+  research:    {title: "Research agent", role: "Gathers background information, prior art, and constraints."},
+  requirements:{title: "Requirements agent", role: "Converts the request and research into structured requirements."},
+  analysis:    {title: "Analysis agent", role: "Identifies viable options, trade-offs, and risks."},
+  solution:    {title: "Solution agent", role: "Proposes a specific, justified technical recommendation."},
+  review:      {title: "Review / Critic agent", role: "Checks the solution against requirements — approves or sends it back."},
+  report:      {title: "Report agent", role: "Combines everything into the final client-ready deliverable."},
+};
+
+const submitBtn = document.getElementById("submitBtn");
+const requestText = document.getElementById("requestText");
+const statusMeta = document.getElementById("statusMeta");
+const timelinePanel = document.getElementById("timelinePanel");
+const timelineEl = document.getElementById("timeline");
+const resultPanel = document.getElementById("resultPanel");
+const reportBox = document.getElementById("reportBox");
+
+function stepCard(stageKey, statusClass, badgeHtml, bodyText) {
+  const info = AGENT_INFO[stageKey];
+  return `
+    <div class="step ${statusClass}">
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-title">${info.title}</span>
+          ${badgeHtml || ""}
+        </div>
+        <div class="step-role">${info.role}</div>
+        <div class="step-body">${bodyText}</div>
+      </div>
+    </div>`;
+}
+
+function renderTimeline(log, data) {
+  if (!log || log.length === 0) {
+    timelineEl.innerHTML = "";
+    return;
+  }
+  const solutionDrafts = data.solution_drafts || [];
+  const reviewHistory = data.review_history || [];
+  let solutionSeen = 0;
+  let reviewSeen = 0;
+  let html = "";
+
+  log.forEach((entry) => {
+    const statusClass = entry.stage === "error" ? "rework" : "done";
+
+    if (entry.stage === "orchestrate") {
+      html += stepCard("orchestrate", statusClass, "",
+        `Classified as: ${data.request_type || entry.summary}`);
+
+    } else if (entry.stage === "research") {
+      html += stepCard("research", statusClass, "", data.research_findings || entry.summary);
+
+    } else if (entry.stage === "requirements") {
+      html += stepCard("requirements", statusClass, "", data.requirements || entry.summary);
+
+    } else if (entry.stage === "analysis") {
+      html += stepCard("analysis", statusClass, "", data.analysis || entry.summary);
+
+    } else if (entry.stage === "solution") {
+      const draft = solutionDrafts[solutionSeen];
+      solutionSeen++;
+      const label = solutionDrafts.length > 1
+        ? `<span class="step-badge rework">draft ${draft ? draft.attempt : solutionSeen}</span>` : "";
+      html += stepCard("solution", statusClass, label, draft ? draft.text : entry.summary);
+
+    } else if (entry.stage === "review") {
+      const rev = reviewHistory[reviewSeen];
+      reviewSeen++;
+      const decision = rev ? rev.decision : (entry.summary.includes("rework") ? "rework" : "approve");
+      const badgeClass = decision === "rework" ? "rework" : "approve";
+      const stepClass = decision === "rework" ? "rework" : "done";
+      const label = `<span class="step-badge ${badgeClass}">${decision}</span>`;
+      html += stepCard("review", stepClass, label, rev ? rev.notes : entry.summary);
+
+    } else if (entry.stage === "report") {
+      html += stepCard("report", statusClass, "", "Final deliverable produced — see below.");
+    }
+  });
+
+  timelineEl.innerHTML = html;
+}
+
+async function poll(requestId){
+  const res = await fetch(`${API}/status/${requestId}`);
+  const statusData = await res.json();
+  renderTimeline(statusData.log || [], statusData);
+
+  if (statusData.status === "running") {
+    statusMeta.textContent = "Running…";
+    setTimeout(() => poll(requestId), 900);
+  } else if (statusData.status === "complete") {
+    statusMeta.textContent = "Complete";
+    submitBtn.disabled = false;
+    const result = await (await fetch(`${API}/result/${requestId}`)).json();
+    renderTimeline(result.log || [], result);
+    resultPanel.classList.remove("hidden");
+    reportBox.textContent = result.final_report;
+  } else {
+    statusMeta.textContent = "Failed — check backend terminal for the error";
+    submitBtn.disabled = false;
+  }
+}
+
+submitBtn.addEventListener("click", async () => {
+  const text = requestText.value.trim();
+  if (!text) return;
+  submitBtn.disabled = true;
+  resultPanel.classList.add("hidden");
+  timelinePanel.classList.remove("hidden");
+  timelineEl.innerHTML = "";
+  statusMeta.textContent = "Submitting…";
+  const res = await fetch(`${API}/submit`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({text})
+  });
+  const data = await res.json();
+  poll(data.request_id);
+});
+</script>
+</body>
+</html>
